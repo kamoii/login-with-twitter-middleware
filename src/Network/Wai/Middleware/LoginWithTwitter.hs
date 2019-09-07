@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE MultiWayIf #-}
 module Network.Wai.Middleware.LoginWithTwitter
   ( Config(..)
   , middleware
