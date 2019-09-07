@@ -4,7 +4,7 @@ github:              "githubuser/login-with-twitter-middleware"
 license:             BSD3
 author:              "Author name here"
 maintainer:          "example@example.com"
-copyright:           "2019 Author name here"
+copyright:           "2019 kamoii"
 
 extra-source-files:
 - README.md
@@ -39,7 +39,7 @@ library:
   source-dirs: src
 
 executables:
-  login-with-twitter-middleware-exe:
+  login-with-twitter-middleware-sample:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -47,15 +47,16 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - scotty
     - login-with-twitter-middleware
 
-tests:
-  login-with-twitter-middleware-test:
-    main:                Spec.hs
-    source-dirs:         test
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - login-with-twitter-middleware
+# tests:
+#   login-with-twitter-middleware-test:
+#     main:                Spec.hs
+#     source-dirs:         test
+#     ghc-options:
+#     - -threaded
+#     - -rtsopts
+#     - -with-rtsopts=-N
+#     dependencies:
+#     - login-with-twitter-middleware
