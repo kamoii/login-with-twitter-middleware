@@ -204,27 +204,3 @@ maybeThrowIO e Nothing  = throwIO e
 whenJust_ :: Applicative m => Maybe a -> (a -> m ()) -> m ()
 whenJust_ (Just a) m = (m a)
 whenJust_ Nothing  _ = pure ()
-
--- twitterLogin
---   :: (MonadIO m, MonadError ServantErr m)
---   => (MonadReader r m, HasOAuthConfig r, HasDbConn r)
---   => LoginInput
---   -> m LoginResult
--- twitterLogin LoginInput{..} = do
---   tmpCred'  <- updateDb (LookupAndDeleteTempCredential (toS oauthToken))
---   tmpCred   <- maybeThrowError err400 tmpCred'
---   cred      <- Twitter.getAccessToken tmpCred (toS oauthVerifier)
---   ta        <- Twitter.extractTwitterAccount cred & maybeThrowError err500
---   user      <- getOrCreateUser ta
---   sessionId <- createSession user
---   pure $ LabelsToJSON
---     ( #sessionId := toS sessionId
---     , #userInfo := LabelsToJSON (userToUserInfo user)
---     )
---   where
---     getOrCreateUser ta = do
---       let id = ta ^. taUserId
---       maybeUser <- queryDb $ LookupUser id
---       case maybeUser of
---         Nothing -> User.createUser ta & updateDb . InsertUser
---         Just user -> pure user
