@@ -129,6 +129,7 @@ middleware' Config{..} vkey secretMapRef manager oauth app req respond
       -- 失敗した場合でも消すべきなのか？疑問
       whenJust_ token' $ modifyIORef' secretMapRef . M.delete
       let req' = req { vault = V.insert vkey result (vault req) }
+      -- TODO: need to unset cookie
       app req' respond
   | otherwise =
       -- delegate
