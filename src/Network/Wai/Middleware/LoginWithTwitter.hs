@@ -58,6 +58,7 @@ data TwitterLoginResult
   | SessionExpired         -- ^ 規定時間内に認証押してくれなかった(攻撃も含まれる)
   | NoToken                -- ^ リクエストトークンの不在(殆どの場合、攻撃かな)
   | InvalidToken           -- ^ 不正なリクエストトークン(攻撃、もしくは既にそのトークンを利用した場合)
+  deriving (Show)
 
 -- ユーザに callbacks url はドメインも含め指定してもらう必要がある。
 -- リバースプロキシの裏で動作する可能性があるので request からはドメイン

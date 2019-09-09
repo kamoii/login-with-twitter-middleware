@@ -49,6 +49,7 @@ executables:
     dependencies:
     - relude
     - scotty
+    - lucid
     - login-with-twitter-middleware
 
 # tests:
