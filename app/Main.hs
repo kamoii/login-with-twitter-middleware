@@ -53,11 +53,8 @@ main = do
           main_ con
 
     readTwitterConsumerVals = do
-      key    <- getEnv "TWITTER_CONSUMER_KEY"
+      key <- getEnv "TWITTER_CONSUMER_KEY"
       secret <- getEnv "TWITTER_CONSUMER_SECRET"
-      when (key == "" || secret == "") do
-        putStrLn "Set TWITTER_CONSUMER_KEY and TWITTER_CONSUMER_SECRET environment variables."
-        exitFailure
       pure (key, secret)
 
     mkLWTConfig consumerKey consumerSecret = LWT.Config
