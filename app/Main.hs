@@ -25,10 +25,9 @@ main = do
     get "/" do
       html . renderText $ content_ do
         h1_ "Test App for login-with-twitter"
-        p_ "Currently not logined."
-        a_ [href_ "/login-with-twitter"] $ button_ "login with twitter"
+        a_ [href_ loginPath] $ button_ "login with twitter"
 
-    post "/login-with-twitter" do
+    get callbackRoute do
       req <- request
       case V.lookup vkey (W.vault req) of
         Just (LWT.Success user) ->
@@ -40,6 +39,10 @@ main = do
           pure ()
 
   where
+    loginPath = "/login-with-twitter"
+    callbackPath = "/login-with-twitter"
+    callbackRoute = fromString . toString $ callbackPath
+
     content_ :: Html () -> Html ()
     content_ con =
       html_ do
@@ -59,8 +62,8 @@ main = do
 
     mkLWTConfig consumerKey consumerSecret = LWT.Config
       { LWT.configOrigin = "http://localhost:8080"
-      , LWT.configLoginPath = "/login-with-twitter"
-      , LWT.configCallbackPath = "/login-with-twitter"
+      , LWT.configLoginPath = loginPath
+      , LWT.configCallbackPath = callbackPath
       , LWT.configConsumerKey = encodeUtf8 consumerKey
       , LWT.configConsumerSecret = encodeUtf8 consumerSecret
       }

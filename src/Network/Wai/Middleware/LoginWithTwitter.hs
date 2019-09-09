@@ -32,8 +32,22 @@ import qualified Web.Twitter.Conduit     as Tw
 import qualified Web.Twitter.Conduit.Api as Tw
 import qualified Web.Twitter.Types       as Tw
 
--- | LoginPath を CallbackUrl は同一パスでも構わない(GET の場合、POST の場合で切り分けられるので)
--- | CallbackUrl は全URIを指定する必要がある(e.g. http://foo.bar.jp/twitter/login。
+-- | LoginPath を CallbackPath は同じパスは許可しない
+-- | e.g. login path    /auth/twitter
+-- |      callback path /auth/twitter/callback
+-- | origin は適切な callback url を構成するのに必要(ユーザが見る origin であり、リバースプロキシの際は注意)
+-- |
+-- | 事前に用意すること
+-- |
+-- |  * twitter App で「認証を有効にしておく」こと、
+-- |  * 無駄な権限要求を外す。
+-- |  * callback url を登録する(http://localhost:8080 とかも受け付けてくれるので手元で動作確認できる)
+-- |
+-- | ユーザが実装するべきこと。
+-- |
+-- |  * <login url> に GET / POST することで twitterの認証画面に遷移する
+-- |  * GET <callback url> で認証の結果を待ち受ける(それ以外は通さない)。リダイレクトで twitter
+-- |    認証画面からクエリパラメータが付いているめ、リダイレクトするべし
 
 -- origin の名前は以下参照
 -- https://stackoverflow.com/questions/2081645/what-do-you-call-the-entire-first-part-of-a-url
@@ -55,6 +69,7 @@ instance Exception TwitterLoginException
 data TwitterLoginResult
   = Success Tw.User        -- ^ ユーザが許可した
   | Denied                 -- ^ ユーザに拒否した
+  | ProblemOccured         -- ^ twitterの認証画面からは返ってきたが、認証もキャンセルでもない(？？)
   | SessionExpired         -- ^ 規定時間内に認証押してくれなかった(攻撃も含まれる)
   | NoToken                -- ^ リクエストトークンの不在(殆どの場合、攻撃かな)
   | InvalidToken           -- ^ 不正なリクエストトークン(攻撃、もしくは既にそのトークンを利用した場合)
@@ -92,6 +107,11 @@ middleware config@Config{..} = do
   let oauth = mkTwitterOAuth configConsumerKey configConsumerSecret callbackUrl
   pure (vkey, middleware' config vkey secretMapRef manager oauth)
 
+-- ユーザが認証画面で不許可(「キャンセル」を選択)にした場合
+-- twitter の 開発者用ドキュメントに書かれていないが、認証画面で「キャンセル」>「<app>に戻る」を選択すると、
+-- <callback url>?denied=<request token> にリダイレクトされる。
+--
+-- callback URL の HEAD要求はサポートしない(というかしては駄目な気がする)
 middleware'
   :: Config
   -> V.Key TwitterLoginResult
@@ -100,7 +120,7 @@ middleware'
   -> Tw.OAuth
   -> Middleware
 middleware' Config{..} vkey secretMapRef manager oauth app req respond
-  | pathIs configLoginPath req && (isGet req || isHead req) = do
+  | pathIs configLoginPath req && (isGet req || isPost req) = do
       -- Get request token and redirect user to twitter login page
       tmpCred <- OA.getTemporaryCredential oauth manager
       TTC{..} <- extractTTC tmpCred & maybeThrowIO InvalidTemporarlCredential
@@ -109,13 +129,14 @@ middleware' Config{..} vkey secretMapRef manager oauth app req respond
       let authUrl = pack $ OA.authorizeUrl oauth tmpCred
       let cookie = renderCookieBS $ mkCookie ttcRequestTokenSecret
       respond $ responseLBS found302 [(hSetCookie, cookie), (hLocation, authUrl)] ""
-  | pathIs configCallbackPath req && isPost req = do
+  | pathIs configCallbackPath req && isGet req = do
       -- Came back from Twtter Login.
       secretMap <- readIORef secretMapRef
       let qs = queryString req
-      let token' = join $ lookup "oauth_token" qs
-      let verifier' = join $ lookup "oauth_verifier" qs
-      let cookieTokenSecret' = lookup hCookie (requestHeaders req) >>= lookup cookieName . Ck.parseCookies
+      let deniedToken'         = join $ lookup "denied" qs
+      let token'               = join $ lookup "oauth_token" qs
+      let verifier'            = join $ lookup "oauth_verifier" qs
+      let cookieTokenSecret'   = lookup hCookie (requestHeaders req) >>= lookup cookieName . Ck.parseCookies
       let expectedTokenSecret' = token' >>= flip M.lookup secretMap
       result <-
         case token' of
@@ -125,16 +146,19 @@ middleware' Config{..} vkey secretMapRef manager oauth app req respond
                 | cookieTokenSecret == expectedTokenSecret ->
                     case verifier' of
                       Just verifier -> handlePermit oauth manager tmpCred verifier
-                      Nothing       -> pure Denied  -- TODO: ユーザが不許可以外にもあるはず
+                      Nothing       -> pure ProblemOccured
                 | otherwise         -> pure InvalidToken
               (Just _ , Nothing)    -> pure InvalidToken
               (Nothing, _      )    -> pure SessionExpired
-          Nothing                   -> pure NoToken
+          Nothing ->
+            case deniedToken' of
+              Just _                -> Denied
+              Nothing               -> NoToken
       -- 失敗した場合でも消すべきなのか？疑問
-      whenJust_ token' $ modifyIORef' secretMapRef . M.delete
-      let req' = req { vault = V.insert vkey result (vault req) }
+      -- 不許可にした場合でも
+      whenJust_ (token' <|> deniedToken') $ modifyIORef' secretMapRef . M.delete
       -- TODO: need to unset cookie
-      app req' respond
+      app (setResult vkey result req) respond
   | otherwise =
       -- delegate
       app req respond
@@ -147,9 +171,11 @@ middleware' Config{..} vkey secretMapRef manager oauth app req respond
       user <- Tw.call twInfo manager Tw.accountVerifyCredentials
       pure $ Success user
 
+    setResult vkey result req =
+      req { vault = V.insert vkey result (vault req) }
+
     pathIs path req = ("/" <> T.intercalate "/" (pathInfo req)) == path
     isGet req = requestMethod req == methodGet
-    isHead req = requestMethod req == methodHead
     isPost req = requestMethod req == methodPost
 
     cookieName = "twitter-oauth-request-token-secret"
