@@ -66,6 +66,7 @@ data TwitterLoginException
 
 instance Exception TwitterLoginException
 
+-- TODO: 整理する必要あり
 data TwitterLoginResult
   = Success Tw.User        -- ^ ユーザが許可した
   | Denied                 -- ^ ユーザに拒否した
@@ -152,8 +153,8 @@ middleware' Config{..} vkey secretMapRef manager oauth app req respond
               (Nothing, _      )    -> pure SessionExpired
           Nothing ->
             case deniedToken' of
-              Just _                -> Denied
-              Nothing               -> NoToken
+              Just _                -> pure Denied
+              Nothing               -> pure NoToken
       -- 失敗した場合でも消すべきなのか？疑問
       -- 不許可にした場合でも
       whenJust_ (token' <|> deniedToken') $ modifyIORef' secretMapRef . M.delete
