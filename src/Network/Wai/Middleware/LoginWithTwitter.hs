@@ -99,14 +99,15 @@ data TwitterLoginResult
 --
 -- request_token + request_token_secret の秘密の鍵によるダイジェストを
 -- cookie の中に一緒に入れれば大丈夫かな？
-middleware :: Config -> IO (V.Key TwitterLoginResult, Middleware)
+middleware :: Config -> IO (Request -> IO TwitterLoginResult, Middleware)
 middleware config@Config{..} = do
   vkey <- V.newKey
   secretMapRef <- newIORef mempty
   manager <- newManager tlsManagerSettings
   let callbackUrl = encodeUtf8 $ configOrigin <> configCallbackPath
   let oauth = mkTwitterOAuth configConsumerKey configConsumerSecret callbackUrl
-  pure (vkey, middleware' config vkey secretMapRef manager oauth)
+  let getResult req = V.lookup vkey (vault req) & maybeThrowIO (ErrorCall "Called on wrong route.")
+  pure (getResult, middleware' config vkey secretMapRef manager oauth)
 
 -- ユーザが認証画面で不許可(「キャンセル」を選択)にした場合
 -- twitter の 開発者用ドキュメントに書かれていないが、認証画面で「キャンセル」>「<app>に戻る」を選択すると、

@@ -4,12 +4,10 @@
 module Main where
 
 import Prelude()
-import qualified Data.Vault.Lazy as V
 import Relude hiding (get)
 import System.Environment (getEnv)
 import Web.Scotty
 import qualified Network.Wai.Middleware.LoginWithTwitter as LWT
-import qualified Network.Wai as W
 import Lucid
 
 -- | Set http://localhost:8080/login-with-twitter as valid callbacl url
@@ -17,7 +15,7 @@ import Lucid
 main :: IO ()
 main = do
   (consumerKey, consumerSecret) <- readTwitterConsumerVals
-  (vkey, lwtMiddleware) <- LWT.middleware (mkLWTConfig consumerKey consumerSecret)
+  (getLoginResult, lwtMiddleware) <- LWT.middleware (mkLWTConfig consumerKey consumerSecret)
 
   scotty 8080 $ do
     middleware lwtMiddleware
@@ -28,19 +26,16 @@ main = do
         a_ [href_ loginPath] $ button_ "login with twitter"
 
     get callbackRoute do
-      req <- request
-      case V.lookup vkey (W.vault req) of
-        Just (LWT.Success user) ->
+      loginResult <- liftIO . getLoginResult =<< request
+      case loginResult of
+        LWT.Success user ->
           pure ()
-        Just _ ->
-          pure ()
-        Nothing ->
-          -- shoudn't occure
+        _ ->
           pure ()
 
   where
-    loginPath = "/login-with-twitter"
-    callbackPath = "/login-with-twitter"
+    loginPath = "/auth/twitter"
+    callbackPath = "/auth/twitter/callback"
     callbackRoute = fromString . toString $ callbackPath
 
     content_ :: Html () -> Html ()
