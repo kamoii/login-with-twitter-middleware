@@ -15,8 +15,9 @@ import Web.Cookie as Ck
 import qualified Web.Twitter.Types as Tw
 import qualified Data.Time.Clock as Cl
 import qualified Data.Time.Calendar as Cl
+import qualified Data.ByteString.Base64.URL as B64
 
--- | Set http://localhost:8080/login-with-twitter as valid callbacl url
+-- | Set http://localhost:8080/auth/twitter/callback as valid callbacl url
 --
 main :: IO ()
 main = do
@@ -41,7 +42,6 @@ main = do
       loginResult <- liftIO . getLoginResult =<< request
       case loginResult of
         LWT.Success user -> do
-          -- setSession . encodeUtf8 $ Tw.userScreenName user <> "@" <>
           setSession . encodeUtf8 $ Tw.userName user <> "@" <> Tw.userScreenName user
           redirect "/"
         _ ->
@@ -81,12 +81,14 @@ main = do
 
     checkSession = do
       ck <- header "cookie"
-      pure $ Ck.parseCookies . encodeUtf8 <$> ck >>= L.lookup sessionKey
+      pure $ Ck.parseCookies . encodeUtf8 <$> ck
+        >>= L.lookup sessionKey
+        >>= rightToMaybe . B64.decode
 
-    setSession name = do
+    setSession value = do
       let ck = Ck.defaultSetCookie
             { Ck.setCookieName = sessionKey
-            , Ck.setCookieValue = name
+            , Ck.setCookieValue = B64.encode value
             , Ck.setCookiePath = Just "/"
             , Ck.setCookieMaxAge = Just 600
             , Ck.setCookieHttpOnly = True

@@ -52,6 +52,7 @@ executables:
     - lucid
     - cookie
     - time
+    - base64-bytestring
     - login-with-twitter-middleware
 
 # tests:
