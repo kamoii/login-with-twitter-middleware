@@ -50,6 +50,7 @@ executables:
     - relude
     - scotty
     - lucid
+    - cookie
     - login-with-twitter-middleware
 
 # tests:

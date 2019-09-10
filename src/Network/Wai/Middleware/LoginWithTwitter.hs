@@ -9,6 +9,7 @@ module Network.Wai.Middleware.LoginWithTwitter
 
 import Network.Wai
 import Control.Monad (when, join)
+import Control.Applicative ((<|>))
 import Control.Exception
 import Data.IORef
 import Data.Function ((&))

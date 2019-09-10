@@ -8,7 +8,11 @@ import Relude hiding (get)
 import System.Environment (getEnv)
 import Web.Scotty
 import qualified Network.Wai.Middleware.LoginWithTwitter as LWT
+import qualified Data.List as L
+import qualified Data.ByteString.Builder as BSB
 import Lucid
+import Web.Cookie as Ck
+import qualified Web.Twitter.Types as Tw
 
 -- | Set http://localhost:8080/login-with-twitter as valid callbacl url
 --
@@ -21,17 +25,23 @@ main = do
     middleware lwtMiddleware
 
     get "/" do
+      userMaybe <- checkSession
       html . renderText $ content_ do
         h1_ "Test App for login-with-twitter"
-        a_ [href_ loginPath] $ button_ "login with twitter"
+        case userMaybe of
+          Just userName -> do
+            p_ . toHtml $ "Hello" <> userName
+          Nothing ->
+            form_ [action_ loginPath] $ button_ "login with twitter"
 
     get callbackRoute do
       loginResult <- liftIO . getLoginResult =<< request
       case loginResult of
-        LWT.Success user ->
-          pure ()
+        LWT.Success user -> do
+          setSession . encodeUtf8 $ Tw.userScreenName user <> "@" <> Tw.userName user
+          redirect "/"
         _ ->
-          pure ()
+          redirect "/"
 
   where
     loginPath = "/auth/twitter"
@@ -59,3 +69,21 @@ main = do
       , LWT.configConsumerKey = encodeUtf8 consumerKey
       , LWT.configConsumerSecret = encodeUtf8 consumerSecret
       }
+
+    sessionKey = "login-with-twitter-name"
+
+    checkSession = do
+      ck <- header "cookie"
+      pure $ Ck.parseCookies . encodeUtf8 <$> ck >>= L.lookup sessionKey
+
+    setSession name = do
+      let ck = Ck.defaultSetCookie
+            { Ck.setCookieName = sessionKey
+            , Ck.setCookieValue = name
+            , Ck.setCookieMaxAge = Just 600
+            , Ck.setCookieHttpOnly = True
+            }
+      setHeader "set-cookie"
+        . decodeUtf8
+        . BSB.toLazyByteString
+        $ Ck.renderSetCookie ck
