@@ -51,6 +51,7 @@ executables:
     - scotty
     - lucid
     - cookie
+    - time
     - login-with-twitter-middleware
 
 # tests:
