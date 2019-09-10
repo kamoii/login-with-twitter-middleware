@@ -19,6 +19,7 @@ import qualified Data.ByteString.Builder as Bu
 import Data.ByteString (ByteString)
 import Data.ByteString.Lazy (toStrict)
 import Data.ByteString.Char8 (pack)
+import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Vault.Lazy as V
 import Network.HTTP.Types.Status (found302)
 import Network.HTTP.Types.Method (methodGet, methodHead, methodPost)
@@ -160,7 +161,6 @@ middleware' Config{..} vkey secretMapRef manager oauth app req respond
       -- 失敗した場合でも消すべきなのか？疑問
       -- 不許可にした場合でも
       whenJust_ (token' <|> deniedToken') $ modifyIORef' secretMapRef . M.delete
-      -- TODO: need to unset cookie
       app (setResult vkey result req) respond
   | otherwise =
       -- delegate
@@ -168,8 +168,22 @@ middleware' Config{..} vkey secretMapRef manager oauth app req respond
   where
     -- ユーザが許可した
     -- NOTE: Authenticate で得られた Credentials って accountVerifyCredentials しか取れない？
+    --
+    -- user_id と screen_name が含まれていた(/auth/authenticate, /oauth/authoriza どちらでも)
+    -- Credential {unCredential =
+    --   [ ("oauth_token","...")
+    --   , ("oauth_token_secret","...")
+    --   , ("user_id","1139930624007929859")
+    --   , ("screen_name","kamoii")
+    --   ]}
+    --
+    -- TwitterErrorMessage {twitterErrorCode = 32, twitterErrorMessage = "Could not authenticate you."}
+    -- 同じ問題に直面している人が居た
+    -- https://github.com/himura/twitter-conduit/issues/64
+    -- oauth_ prefix 以外のパラメータを消したらうまくいくそうで。
     handlePermit oauth manager tmpCred verifier = do
-      cred <- OA.getAccessToken oauth (OA.injectVerifier verifier tmpCred) manager
+      OA.Credential cred' <- OA.getAccessToken oauth (OA.injectVerifier verifier tmpCred) manager
+      let cred = OA.Credential $ filter (\(k,_) -> BS8.isPrefixOf "oauth_" k) cred'
       let twInfo = Tw.def { Tw.twToken = Tw.def { Tw.twOAuth = oauth, Tw.twCredential = cred } }
       user <- Tw.call twInfo manager Tw.accountVerifyCredentials
       pure $ Success user
@@ -184,18 +198,21 @@ middleware' Config{..} vkey secretMapRef manager oauth app req respond
     cookieName = "twitter-oauth-request-token-secret"
 
     -- expires within 10 minutes
+    -- only send for callback path
     mkCookie value = Ck.defaultSetCookie
       { Ck.setCookieName = cookieName
       , Ck.setCookieValue = value
       , Ck.setCookieHttpOnly = True
       , Ck.setCookieSecure = T.isPrefixOf "https://" configOrigin
       , Ck.setCookieMaxAge = Just 600
+      , Ck.setCookiePath = Just (encodeUtf8 configCallbackPath)
       }
 
     renderCookieBS = toStrict . Bu.toLazyByteString . Ck.renderSetCookie
 
 
 -- https://developer.twitter.com/en/docs/twitter-for-websites/log-in-with-twitter/guides/implementing-sign-in-with-twitter
+-- https://developer.twitter.com/en/docs/basics/authentication/api-reference/authorize
 mkTwitterOAuth
   :: ByteString   -- ^ Consumer Key
   -> ByteString   -- ^ Consumer Secret

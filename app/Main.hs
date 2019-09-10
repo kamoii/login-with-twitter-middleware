@@ -38,7 +38,8 @@ main = do
       loginResult <- liftIO . getLoginResult =<< request
       case loginResult of
         LWT.Success user -> do
-          setSession . encodeUtf8 $ Tw.userScreenName user <> "@" <> Tw.userName user
+          -- setSession . encodeUtf8 $ Tw.userScreenName user <> "@" <> Tw.userName user
+          setSession . encodeUtf8 $ Tw.userScreenName user
           redirect "/"
         _ ->
           redirect "/"
@@ -80,10 +81,11 @@ main = do
       let ck = Ck.defaultSetCookie
             { Ck.setCookieName = sessionKey
             , Ck.setCookieValue = name
+            , Ck.setCookiePath = Just "/"
             , Ck.setCookieMaxAge = Just 600
             , Ck.setCookieHttpOnly = True
             }
-      setHeader "set-cookie"
+      setHeader "Set-Cookie"
         . decodeUtf8
         . BSB.toLazyByteString
         $ Ck.renderSetCookie ck
