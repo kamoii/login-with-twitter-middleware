@@ -50,6 +50,8 @@ import qualified Web.Twitter.Types       as Tw
 -- |  * <login url> に GET / POST することで twitterの認証画面に遷移する
 -- |  * GET <callback url> で認証の結果を待ち受ける(それ以外は通さない)。リダイレクトで twitter
 -- |    認証画面からクエリパラメータが付いているめ、リダイレクトするべし
+-- |  * このライブラリで行なうのは callback url のリクエストに結果を付けまでで、
+-- |    セッション張ったりはユーザの仕事
 
 -- origin の名前は以下参照
 -- https://stackoverflow.com/questions/2081645/what-do-you-call-the-entire-first-part-of-a-url
