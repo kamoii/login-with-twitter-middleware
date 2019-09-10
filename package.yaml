@@ -1,6 +1,6 @@
 name:                login-with-twitter-middleware
 version:             0.1.0.0
-github:              "githubuser/login-with-twitter-middleware"
+github:              "kamoii/login-with-twitter-middleware"
 license:             BSD3
 author:              "Author name here"
 maintainer:          "example@example.com"
@@ -22,7 +22,6 @@ description:         Please see the README on GitHub at <https://github.com/gith
 dependencies:
 - base >= 4.7 && < 5
 - wai
-- warp
 - http-types
 - http-client
 - http-client-tls
@@ -48,6 +47,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - relude
+    - warp
     - scotty
     - lucid
     - cookie
